@@ -22,6 +22,7 @@ class Constants(PathInfo):
     # firm related variables
     SIC_CODE = 'sic'
     SIC2_CODE = 'sic2'
+    SIC3_CODE = 'sic3'
     COMPANY_NAME = 'conm'
     EMPLOYEE_NUMBER = 'emp'
     STATE = 'state'
