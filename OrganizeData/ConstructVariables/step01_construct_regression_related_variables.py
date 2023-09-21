@@ -84,7 +84,7 @@ if __name__ == '__main__':
         us_ctat_df.loc[:, key] = us_ctat_df[key].apply(lambda x: 0 if x < 0 else 1 if x > 1 else x)
 
     # construct DELTA_MVA and DELTA_BVA
-    us_ctat_df.loc[:, 'MVA'] = us_ctat_df['at'] + us_ctat_df['MKVALT'] - us_ctat_df['seq']
+    us_ctat_df.loc[:, 'MVA'] = us_ctat_df['at'] + us_ctat_df['mkvalt'] - us_ctat_df['seq']
     us_ctat_df.loc[:, 'lag_MVA'] = us_ctat_df.groupby(const.GVKEY)['MVA'].shift(1)
     us_ctat_df.loc[:, 'lag_MVA'] = us_ctat_df.loc[:, 'lag_MVA'].fillna(us_ctat_df.loc[:, 'lag_at'])
     us_ctat_df.loc[:, 'lag_txr'] = us_ctat_df.groupby(const.GVKEY)['txr'].shift(1)
