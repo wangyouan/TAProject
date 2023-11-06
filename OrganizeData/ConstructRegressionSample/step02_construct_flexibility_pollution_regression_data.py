@@ -46,5 +46,7 @@ if __name__ == '__main__':
         all_dep_keys.extend(['{}_{}'.format(i, lag_year) for i in dep_keys])
 
     reg_df2: DataFrame = reg_df.replace([np.inf, -np.inf], np.nan).dropna(subset=all_dep_keys, how='all')
+    reg_df2.loc[:, const.SIC2_CODE] = reg_df2[const.SIC_CODE].str[:2]
+    reg_df2.loc[:, const.SIC3_CODE] = reg_df2[const.SIC_CODE].str[:3]
     reg_df2.to_stata(os.path.join(const.RESULT_PATH, '20231106_fluidity_pollution_regression_data.dta'),
                      write_index=False)
