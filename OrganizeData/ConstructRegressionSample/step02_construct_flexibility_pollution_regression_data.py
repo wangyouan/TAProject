@@ -20,11 +20,13 @@ from Constants import Constants as const
 
 if __name__ == '__main__':
     fluidity_df: DataFrame = pd.read_csv(os.path.join(r'C:\Users\wyatc\OneDrive\Projects\PossibleProjects',
-                                                      '20230816 From GuMing', 'FluidityData.csv'))
+                                                      '20230816 Fluidity From GuMing', 'FluidityData.csv'))
     pollution_df: DataFrame = pd.read_pickle(os.path.join(r'C:\Users\wyatc\OneDrive\Projects\GreenLoan\data\TRI',
                                                           'firm_level.pkl')).drop(
         'parent_company_name,parent_company_db_number,parent_company_name_standardized'.split(','), axis=1)
     ctat_df: DataFrame = pd.read_pickle(os.path.join(const.TEMP_PATH, '1950_2023_ctat_ta_ctrl_variables.pkl'))
+    regulation_df: DataFrame = pd.read_csv(os.path.join(r'C:\Users\wyatc\OneDrive\Projects\PossibleProjects',
+                                                        '20231109 Regulatory From GuMing', 'companyyear_measures.csv'))
 
     for key in ['air_release', 'water_release', 'land_release', 'total_release', 'sr_activities_num',
                 'substitutions_num', 'product_num', 'process_modification_num', 'inventory_num', 'good_practics_num',
@@ -33,8 +35,9 @@ if __name__ == '__main__':
         pollution_df.loc[:, 'ln1_{}'.format(key)] = pollution_df[key].apply(lambda x: np.log(x + 1))
         pollution_df.loc[:, 'ln_{}'.format(key)] = pollution_df[key].apply(np.log)
 
-    reg_df: DataFrame = pollution_df.merge(fluidity_df, on=[const.GVKEY, const.YEAR], how='right').merge(ctat_df, on=[
-        const.GVKEY, const.YEAR], how='inner')
+    reg_df: DataFrame = pollution_df.merge(fluidity_df, on=[const.GVKEY, const.YEAR], how='outer').merge(
+        regulation_df, on=[const.GVKEY, const.YEAR], how='outer').merge(
+        ctat_df, on=[const.GVKEY, const.YEAR], how='inner')
 
     dep_keys = list(pollution_df.keys()[2:])
     all_dep_keys = dep_keys[:]
@@ -48,5 +51,5 @@ if __name__ == '__main__':
     reg_df2: DataFrame = reg_df.replace([np.inf, -np.inf], np.nan).dropna(subset=all_dep_keys, how='all')
     reg_df2.loc[:, const.SIC2_CODE] = reg_df2[const.SIC_CODE].str[:2]
     reg_df2.loc[:, const.SIC3_CODE] = reg_df2[const.SIC_CODE].str[:3]
-    reg_df2.to_stata(os.path.join(const.RESULT_PATH, '20231106_fluidity_pollution_regression_data.dta'),
+    reg_df2.to_stata(os.path.join(const.RESULT_PATH, '20231110_fluidity_regulation_pollution_regression_data.dta'),
                      write_index=False)
