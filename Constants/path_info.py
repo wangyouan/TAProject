@@ -11,7 +11,8 @@ import os
 
 class PathInfo(object):
     DATA_PATH = r'C:\Users\wyatc\OneDrive\Projects\Same Sex Marriage\data'
-    EDGAR_DATA_PATH = r'C:\Users\wyatc\OneDrive\Projects\PossibleProjects\EDGAR'
+    POSSIBLE_PROJECT_PATH = r'C:\Users\wyatc\OneDrive\Projects\PossibleProjects'
+    EDGAR_DATA_PATH = os.path.join(POSSIBLE_PROJECT_PATH, r'EDGAR')
     RESULT_PATH = r'C:\Users\wyatc\OneDrive\Temp\Projects\MarriageAct\results'
     TEMP_PATH = r'C:\Users\wyatc\OneDrive\Temp\Projects\MarriageAct\temp'
 
