@@ -25,7 +25,6 @@ def construct_event_post_dummy(sub_df):
         return sub_df
 
     event_year_df = sub_df.loc[sub_df['tariff_event'] == 1].copy()
-    sub_df.loc[:, 'tariff_treated'] = 1
     for i in sub_df.index:
         current_year = sub_df.loc[i, const.YEAR]
         diff = 100
@@ -45,6 +44,7 @@ def construct_event_post_dummy(sub_df):
 
         if diff >= 0:
             sub_df.loc[i, 'tariff_post'] = 1
+
     return sub_df
 
 
@@ -57,23 +57,22 @@ if __name__ == '__main__':
     reg_df_tar: DataFrame = reg_df.merge(tariff_df, on=[const.SIC3_CODE, const.YEAR], how='left')
     reg_df_tar.loc[:, 'tariff_cut'] = reg_df_tar['tariff_cut'].fillna(0)
     reg_df_tar.loc[:, 'tariff_event'] = (reg_df_tar['tariff_cut'] == 1).astype(int)
-    reg_df_tar.loc[:, 'tariff_treated'] = 0
     reg_df_tar.loc[:, 'tariff_post'] = 0
     for lag_year in range(1, 6):
         reg_df_tar.loc[:, 'tariff_event_m{}'.format(lag_year)] = 0
         reg_df_tar.loc[:, 'tariff_event_p{}'.format(lag_year)] = 0
 
-    reg_df_tar2: DataFrame = reg_df_tar.groupby(const.GVKEY).apply(construct_event_post_dummy).reset_index(drop=True)
-    reg_df_tar2.loc[:, 'psm_sample'] = reg_df_tar2['tariff_treated']
-    reg_df_tar2.loc[:, 'psm_id'] = np.nan
+    reg_df_tar.loc[:, 'psm_sample'] = 0
+    reg_df_tar.loc[:, 'psm_id'] = np.nan
 
     ctrl_vars = 'Size MktCap PROA Leverage'.split(' ')
-    reg_df_tar3 = reg_df_tar2.dropna(subset=ctrl_vars, how='any')
-    event_gvkeys = reg_df_tar3.loc[reg_df_tar3['tariff_treated'] == 1, 'gvkey'].drop_duplicates()
+    reg_df_tar3 = reg_df_tar.dropna(subset=ctrl_vars, how='any')
+    event_gvkeys = reg_df_tar3.loc[reg_df_tar3['tariff_event'] == 1, 'gvkey'].drop_duplicates()
+    no_match_list = list()
     for gvkey in event_gvkeys:
         event_df: DataFrame = reg_df_tar3.loc[reg_df_tar3[const.GVKEY] == gvkey].copy()
-        match_year = event_df.loc[event_df['tariff_post'] == 1, const.YEAR].min()
-        match_id = event_df.loc[event_df['tariff_post'] == 1, const.YEAR].idxmin()
+        match_year = event_df.loc[event_df['tariff_event'] == 1, const.YEAR].min()
+        match_id = event_df.loc[event_df['tariff_event'] == 1, const.YEAR].idxmin()
 
         control_df: DataFrame = reg_df_tar3.loc[reg_df_tar3['psm_sample'] == 0].copy()
         control_df2: DataFrame = control_df.loc[control_df[const.YEAR] == match_year].copy()
@@ -81,12 +80,11 @@ if __name__ == '__main__':
 
         if gvkey_list.empty:
             print(gvkey, 'no potential gvkey list')
+            no_match_list.append(gvkey)
             continue
 
         elif len(gvkey_list) == 1:
-            reg_df_tar3.loc[reg_df_tar3[const.GVKEY] == gvkey_list[0], 'psm_sample'] = 1
-            reg_df_tar3.loc[reg_df_tar3[const.GVKEY] == gvkey_list[0], 'psm_id'] = gvkey
-            reg_df_tar3.loc[reg_df_tar3[const.GVKEY] == gvkey, 'psm_id'] = gvkey
+            matched_gvkey = gvkey_list[0]
 
         else:
             reg_df: DataFrame = control_df2.copy()
@@ -94,14 +92,16 @@ if __name__ == '__main__':
             X = reg_df2[ctrl_vars]
             if X.shape[0] < 2:
                 print(gvkey, 'no enough ctrl variables')
+                no_match_list.append(gvkey)
                 continue
             elif X.shape[0] == 2:
                 matched_gvkey = reg_df['gvkey'].iloc[0]
             else:
                 X = sm.add_constant(X)
-                Y = reg_df2['tariff_treated']
+                Y = reg_df2['tariff_event']
                 if Y.sum() == 0:
                     print(gvkey, 'dependent all zero')
+                    no_match_list.append(gvkey)
                     continue
 
                 model = sm.OLS(Y, X)
@@ -114,10 +114,22 @@ if __name__ == '__main__':
                 matched_id = reg_df['abs_diff'].idxmin()
                 matched_gvkey = reg_df.loc[matched_id, const.GVKEY]
 
-            reg_df_tar3.loc[reg_df_tar3[const.GVKEY] == matched_gvkey, 'psm_sample'] = 1
-            reg_df_tar3.loc[reg_df_tar3[const.GVKEY] == matched_gvkey, 'psm_id'] = gvkey
-            reg_df_tar3.loc[reg_df_tar3[const.GVKEY] == gvkey, 'psm_id'] = gvkey
+        reg_df_tar3.loc[reg_df_tar3[const.GVKEY] == matched_gvkey, 'psm_sample'] = 1
+        reg_df_tar3.loc[reg_df_tar3[const.GVKEY] == gvkey, 'psm_sample'] = 1
+        reg_df_tar3.loc[reg_df_tar3[const.GVKEY] == matched_gvkey, 'psm_id'] = gvkey
+        event_years = reg_df_tar3.loc[
+            (reg_df_tar3[const.GVKEY] == gvkey) & (reg_df_tar3['tariff_event'] == 1), const.YEAR]
+        for year in event_years:
+            reg_df_tar3.loc[
+                (reg_df_tar3[const.GVKEY] == matched_gvkey) & (reg_df_tar3['year'] == year), 'tariff_event'] = 1
 
+        reg_df_tar3.loc[reg_df_tar3[const.GVKEY] == gvkey, 'psm_id'] = gvkey
+
+    for gvkey in no_match_list:
+        reg_df_tar3.loc[reg_df_tar3[const.GVKEY] == gvkey, 'psm_sample'] = -1
+
+    reg_df_tar3: DataFrame = reg_df_tar3.groupby(const.GVKEY).apply(construct_event_post_dummy).reset_index(drop=True)
     reg_df_tar3[const.SIC3_CODE] = reg_df_tar3[const.SIC3_CODE].astype(int)
-    reg_df_tar3.to_pickle(os.path.join(const.TEMP_PATH, '20231117_pollution_regression_data.pkl'))
-    reg_df_tar3.to_stata(os.path.join(const.RESULT_PATH, '20231117_pollution_regression_data.dta'), write_index=False)
+    reg_df_tar3.loc[:, 'tariff_treated'] = (reg_df_tar3['psm_id'] == reg_df_tar3[const.GVKEY]).astype(int)
+    reg_df_tar3.to_pickle(os.path.join(const.TEMP_PATH, '20231127_pollution_regression_data.pkl'))
+    reg_df_tar3.to_stata(os.path.join(const.RESULT_PATH, '20231127_pollution_regression_data.dta'), write_index=False)
